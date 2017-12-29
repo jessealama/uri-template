@@ -6,6 +6,9 @@
 
 (define deps
   '("base"
+    "brag"
+    "beautiful-racket-lib"
+    "br-parser-tools-lib"
     "rackunit-lib"))
 
 (define build-deps
