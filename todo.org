@@ -1,0 +1,6 @@
+* Define notion of assignment
+  A hash seems right. Keys are symbols, values are either strings or hashs of symbols and strings (the latter is for level 4 support)
+* Define expansion of a template
+  Arguments are a uri-template? and an assignment?, value is a url?
+* Define matching of a url? against a template
+* Record level 1 examples as tests
