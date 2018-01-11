@@ -4,7 +4,7 @@ all:
 	# nothing to do
 
 test:
-	raco test *.rkt
+	find . -mindepth 1 -maxdepth 1 -type f -name '*.rkt' -exec basename {} ';' | parallel --jobs=1 --halt-on-error=now,fail=1 raco test {}
 
 clean:
 	find . -mindepth 1 -maxdepth 1 -type f -name '*~' -delete

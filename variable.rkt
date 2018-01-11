@@ -1,16 +1,26 @@
 #lang racket/base
 
-(provide variable?)
+(provide variable
+         variable?
+         variable-name
+         variable-modifier
+         acceptable-variable-name?
+         exploded?)
 
 (require (only-in racket/list
                   empty?
                   first
                   second
                   third
-                  rest))
+                  rest)
+         racket/contract)
 
 (module+ test
   (require rackunit))
+
+(struct variable
+  (modifier name)
+  #:transparent)
 
 (define hex-chars
   (list #\0 #\1 #\2 #\3 #\4 #\5 #\6 #\7 #\8 #\9
@@ -64,7 +74,7 @@
         (else
          (characters-ok? (rest chars)))))
 
-(define (variable? x)
+(define (acceptable-variable-name? x)
   (cond ((not (string? x))
          #f)
         ((not (regexp-match-exact? #px"[0-9a-zA-Z_%]+" x))
@@ -73,12 +83,18 @@
          (characters-ok? (string->list x)))))
 
 (module+ test
-  (check-false (variable? ""))
-  (check-true (variable? "var"))
-  (check-true (variable? "semi"))
-  (check-false (variable? "?"))
-  (check-true (variable? "hi%ae"))
-  (check-false (variable? "no%"))
-  (check-false (variable? "no%a"))
-  (check-false (variable? "var%0r"))
-  (check-false (variable? "var%x0")))
+  (check-false (acceptable-variable-name? ""))
+  (check-true (acceptable-variable-name? "var"))
+  (check-true (acceptable-variable-name? "semi"))
+  (check-false (acceptable-variable-name? "?"))
+  (check-true (acceptable-variable-name? "hi%ae"))
+  (check-false (acceptable-variable-name? "no%"))
+  (check-false (acceptable-variable-name? "no%a"))
+  (check-false (acceptable-variable-name? "var%0r"))
+  (check-false (acceptable-variable-name? "var%x0")))
+
+(define/contract (exploded? var)
+  (variable?  . -> . boolean?)
+  (define m (variable-modifier var))
+  (and (string? m)
+       (string=? "*" m)))
