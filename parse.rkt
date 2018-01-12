@@ -167,13 +167,11 @@
 
 (define/contract (simplify-variables varlist)
   (list? . -> . (listof variable?))
-  (log-error "simplifying variables ~a" varlist)
   (define no-commas (remove* (list ",") varlist))
   (map simplify-varspec no-commas))
 
 (define/contract (simplify parsed-expression)
   (list? . -> . template?)
-  ;(log-error "parsed-expression = ~a" parsed-expression)
   (match parsed-expression
     [(list)
      empty]
@@ -183,27 +181,6 @@
      (template operator (simplify-variables l))]
     [else
      (error (format "Cannot handle parsed expression ~a" parsed-expression))]))
-
-;; (module+ test
-;;   (check-equal? '(varname "foo")
-;;                 (simplify '(varname (varchar f)
-;;                                     (varchar o)
-;;                                     (varchar o))))
-;;   (check-equal? '(expression
-;;                   "{"
-;;                   (variable-list
-;;                    (varspec
-;;                     (varname "var")))
-;;                   "}")
-;;                 (simplify
-;;                  '(expression "{"
-;;                               (variable-list
-;;                                (varspec
-;;                                 (varname
-;;                                  (varchar v)
-;;                                  (varchar a)
-;;                                  (varchar r))))
-;;                               "}"))))
 
 (define/contract (parse-template/list chars)
   (-> (listof char?) (listof (or/c char? template?)))
@@ -225,24 +202,6 @@
         (else
          (cons (first chars)
                (parse-template/list (rest chars))))))
-
-;; (module+ test
-;;   (check-true (empty? (parse-template/list empty)))
-;;   (check-equal? (list #\a #\b)
-;;                 (parse-template/list '(#\a #\b)))
-;;   (check-exn exn:fail?
-;;              (lambda () (parse-template/list (list #\{))))
-;;   (let* ([t "a{?e}"]
-;;          [chars (string->list t)])
-;;     (test-begin
-;;       (check-not-exn (lambda () (parse-template/list chars)))
-;;       (let ([parsed (parse-template/list chars)])
-;;         (check-false (empty? parsed))
-;;         (check-equal? #\a (first parsed))
-;;         (check-true (list? (second parsed)))
-;;         (check-= 2
-;;                  (length parsed)
-;;                  0)))))
 
 (define/contract (render-parse parsed)
   ((listof (or/c char? template?)) . -> . (listof (or/c string? template?)))
