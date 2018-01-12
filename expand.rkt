@@ -52,7 +52,6 @@
 
 (define/contract (explode value)
   (value? . -> . (or/c string-value? list-value?))
-  (log-error "exploding value ~a" value)
   value)
 
 (define/contract (apply-max-length-modifier str-value max-length)
@@ -67,7 +66,6 @@
    value?
    . -> .
    value?)
-  (log-error "applying modifier ~a to value ~a" modifier value)
   (match modifier
     [#f
      value]
@@ -78,18 +76,262 @@
     [else
      (error (format "Don't know how to apply modifier ~a to value ~a" modifier value))]))
 
-(define/contract (render-items items separator)
-  ((listof string?) string? . -> . string?)
+(define/contract (render-items items separator encoder)
+  ((listof string?) string? (-> string? string?) . -> . string?)
   (cond ((empty? items)
          "")
         ((empty? (rest items))
-         (first items))
+         (encoder (first items)))
         (else
          (format "~a~a~a"
-                 (first items)
+                 (encoder (first items))
                  separator
                  (render-items (rest items)
-                               separator)))))
+                               separator
+                               encoder)))))
+
+(define/contract (render-associations associations separator encoder)
+  ((listof (listof string?)) string? (-> string? string?) . -> . string?)
+  (match associations
+    [(list)
+     ""]
+    [(list (list a ""))
+     (encoder a)]
+    [(list (list a b))
+     (format "~a=~a"
+             (encoder a)
+             (encoder b))]
+    [(cons (list a "") more)
+     (format "~a~a~a"
+             (encoder a)
+             separator
+             (render-associations more
+                                  separator
+                                  encoder))]
+    [(cons (list a b) more)
+     (format "~a=~a~a~a"
+             (encoder a)
+             (encoder b)
+             separator
+             (render-associations more
+                                  separator
+                                  encoder))]))
+
+(define/contract (render-associations/allow-empty associations separator encoder)
+  ((listof (listof string?)) string? (-> string? string?) . -> . string?)
+  (match associations
+    [(list)
+     ""]
+    [(list (list a b))
+     (format "~a=~a"
+             (encoder a)
+             (encoder b))]
+    [(cons (list a b) more)
+     (format "~a=~a~a~a"
+             (encoder a)
+             (encoder b)
+             separator
+             (render-associations/allow-empty more
+                                              separator
+                                              encoder))]))
+
+(define/contract (render-value-for-variable/default var val)
+  (variable? value? . -> . string?)
+  (cond ((string-value? val)
+         val)
+        ((list-value? val)
+         (render-items val "," encode-value))
+        ((associative-array-value? val)
+         (cond ((exploded? var)
+                (render-associations val "," encode-value))
+               (else
+                (render-items (associative-array->list val)
+                              ","
+                              encode-value))))))
+
+(define/contract (expand-variable/default var assignment)
+  (variable?
+   assignment?
+   . -> .
+   string?)
+  (define val (assignment-ref assignment var))
+  (define modifier (variable-modifier var))
+  (cond ((string-value? val)
+         (encode-value (apply-modifier modifier val)))
+        ((list-value? val)
+         (render-items val "," encode-value))
+        ((associative-array-value? val)
+         (cond ((exploded? var)
+                (render-associations val "," encode-value))
+               (else
+                (render-items (associative-array->list val) "," encode-value))))))
+
+(define/contract (expand-variable/path var assignment)
+  (variable?
+   assignment?
+   . -> .
+   string?)
+  (define val (assignment-ref assignment var))
+  (define modifier (variable-modifier var))
+  (cond ((string-value? val)
+         (encode-value (apply-modifier modifier val)))
+        ((list-value? val)
+         (cond ((exploded? var)
+                (render-items val "/" encode-value))
+               (else
+                (render-items val "," encode-value))))
+        ((associative-array-value? val)
+         (cond ((exploded? var)
+                (render-associations val "/" encode-value))
+               (else
+                (render-items (associative-array->list val) "," encode-value))))))
+
+(define/contract (expand-variable/path-style var assignment)
+  (variable?
+   assignment?
+   . -> .
+   string?)
+  (define val (assignment-ref assignment var))
+  (define modifier (variable-modifier var))
+  (cond ((string-value? val)
+         (render-associations (list (list (variable-name var)
+                                                      (apply-modifier modifier val)))
+                                          ";"
+                                          encode-value))
+        ((list-value? val)
+         (cond ((exploded? var)
+                (render-associations (map (lambda (x)
+                                                        (list (variable-name var) x))
+                                                      val)
+                                                 ";"
+                                                 encode-value))
+               (else
+                (format "~a=~a"
+                        (variable-name var)
+                        (render-items val "," encode-value)))))
+        ((associative-array-value? val)
+         (cond ((exploded? var)
+                (render-associations val ";" encode-value))
+               (else
+                (format "~a=~a"
+                        (variable-name var)
+                        (render-items (associative-array->list val) "," encode-value)))))))
+
+(define/contract (expand-variable/form-style var assignment)
+  (variable?
+   assignment?
+   . -> .
+   string?)
+  (define val (assignment-ref assignment var))
+  (define modifier (variable-modifier var))
+  (cond ((string-value? val)
+         (render-associations/allow-empty (list (list (variable-name var)
+                                          (apply-modifier modifier val)))
+                              "&"
+                              encode-value))
+        ((list-value? val)
+         (cond ((exploded? var)
+                (render-associations/allow-empty (map (lambda (x)
+                                            (list (variable-name var) x))
+                                          val)
+                                     "&"
+                                     encode-value))
+               (else
+                (format "~a=~a"
+                        (variable-name var)
+                        (render-items val "," encode-value)))))
+        ((associative-array-value? val)
+         (cond ((exploded? var)
+                (render-associations/allow-empty val "&" encode-value))
+               (else
+                (format "~a=~a"
+                        (variable-name var)
+                        (render-items (associative-array->list val) "," encode-value)))))))
+
+(define/contract (expand-variable/form-continuation-style var assignment)
+  (variable?
+   assignment?
+   . -> .
+   string?)
+  (define val (assignment-ref assignment var))
+  (define modifier (variable-modifier var))
+  (cond ((string-value? val)
+         (render-associations/allow-empty (list (list (variable-name var)
+                                                      (apply-modifier modifier val)))
+                                          "&"
+                                          encode-value))
+        ((list-value? val)
+         (cond ((exploded? var)
+                (render-associations/allow-empty (map (lambda (x)
+                                            (list (variable-name var) x))
+                                          val)
+                                     "&"
+                                     encode-value))
+               (else
+                (format "~a=~a"
+                        (variable-name var)
+                        (render-items val "," encode-value)))))
+        ((associative-array-value? val)
+         (cond ((exploded? var)
+                (render-associations/allow-empty val "&" encode-value))
+               (else
+                (format "~a=~a"
+                        (variable-name var)
+                        (render-items (associative-array->list val) "," encode-value)))))))
+
+(define/contract (expand-variable/reserved var assignment)
+  (variable?
+   assignment?
+   . -> .
+   string?)
+  (define val (assignment-ref assignment var))
+  (define modifier (variable-modifier var))
+  (cond ((string-value? val)
+         (encode/reserved (apply-modifier modifier val)))
+        ((list-value? val)
+         (render-items val "," encode/reserved))
+        ((associative-array-value? val)
+         (cond ((exploded? var)
+                (render-associations val "," encode/reserved))
+               (else
+                (render-items (associative-array->list val) "," encode/reserved))))))
+
+(define/contract (expand-variable/fragment var assignment)
+  (variable?
+   assignment?
+   . -> .
+   string?)
+  (define val (assignment-ref assignment var))
+  (define modifier (variable-modifier var))
+  (cond ((string-value? val)
+         (encode/reserved (apply-modifier modifier val)))
+        ((list-value? val)
+         (render-items val "," encode/reserved))
+        ((associative-array-value? val)
+         (cond ((exploded? var)
+                (render-associations val "," encode/reserved))
+               (else
+                (render-items (associative-array->list val) "," encode/reserved))))))
+
+(define/contract (expand-variable/label var assignment)
+  (variable?
+   assignment?
+   . -> .
+   string?)
+  (define val (assignment-ref assignment var))
+  (define modifier (variable-modifier var))
+  (cond ((string-value? val)
+         (encode-value (apply-modifier modifier val)))
+        ((list-value? val)
+         (cond ((exploded? var)
+                (render-items val "." encode-value))
+               (else
+                (render-items val "," encode-value))))
+        ((associative-array-value? val)
+         (cond ((exploded? var)
+                (render-associations val "." encode-value))
+               (else
+                (render-items (associative-array->list val) "," encode-value))))))
 
 (define/contract (expand-variable var assignment operator)
   (variable?
@@ -97,28 +339,25 @@
    (or/c false/c string?)
    . -> .
    string?)
-  (log-error "expanding variable ~a" var)
-  (log-error "modifier is ~a" (variable-modifier var))
-  (log-error "operator is ~a" operator)
-  (define val (assignment-ref assignment var))
-  (define modifier (variable-modifier var))
-  (cond ((string-value? val)
-         (apply-modifier modifier val))
-        ((list-value? val)
-         (cond ((exploded? var)
-                (render-items val (separator-for-operator operator)))
-               (else
-                (render-items val ","))))
-        ((associative-array-value? val)
-         (match modifier
-           ["*"
-            val]
-           [else
-            (log-error "turning assoc val into a list ~a" val)
-            (apply-modifier modifier
-                            (associative-array->list val))]))
-        (else
-         (error (format "Unexpected value: ~a" val)))))
+  (match operator
+    [#f
+     (expand-variable/default var assignment)]
+    ["/"
+     (expand-variable/path var assignment)]
+    [";"
+     (expand-variable/path-style var assignment)]
+    ["?"
+     (expand-variable/form-style var assignment)]
+    ["&"
+     (expand-variable/form-continuation-style var assignment)]
+    ["+"
+     (expand-variable/reserved var assignment)]
+    ["#"
+     (expand-variable/fragment var assignment)]
+    ["."
+     (expand-variable/label var assignment)]
+    [else
+     (error (format "Don't know how to deal with operator ~a" operator))]))
 
 (define separators
   (hash
@@ -137,119 +376,16 @@
     (error (format "Do not know separator for operator ~a." operator)))
   (hash-ref separators operator))
 
-(define/contract (apply-operator/string operator str-value)
-  ((or/c false/c string?) string-value? . -> . string?)
-  (log-error "applying operator ~a to string ~a" operator str-value)
-  (match operator
-    [#f
-     (encode-value str-value)]
-    ["+"
-     (encode/reserved str-value)]
-    ["#"
-     (encode/reserved str-value)]
-    ["."
-     (encode/reserved str-value)]
-    ["/"
-     (encode/reserved str-value)]
-    [";"
-     (encode/reserved str-value)]
-    ["?"
-     (encode/reserved str-value)]
-    ["&"
-     (encode/reserved str-value)]
-    [else
-     (error "Unhandled operator ~a" operator)]))
-
-(define/contract (apply-operator/list operator list)
-  ((or/c false/c string?) list-value? . -> . string?)
-  (log-error "applying operator ~a to list value ~a" operator list)
-  (cond ((empty? list)
-         "")
-        ((empty? (rest list))
-         (apply-operator/item operator (first list)))
-        (else
-         (format "~a~a~a"
-                 (apply-operator/item operator (first list))
-                 (separator-for-operator operator)
-                 (apply-operator/list operator (rest list))))))
-
-(define/contract (apply-operator/associative operator assoc)
-  ((or/c false/c string?)
-   associative-array-value?
-   . -> .
-   string?)
-  (log-error "applying operator ~a to assoc value ~a" operator assoc)
-  (cond ((empty? assoc)
-         "")
-        ((empty? (rest assoc))
-         (define k (first (first assoc)))
-         (define v (second (first assoc)))
-         (if (string=? "" v)
-             k
-             (format "~a=~a" k v)))
-        (else
-         (define k (first (first assoc)))
-         (define v (second (first assoc)))
-         (if (string=? "" v)
-             (format "~a~a~a"
-                     k
-                     (separator-for-operator operator)
-                     (apply-operator/associative operator (rest assoc)))
-             (format "~a=~a~a~a"
-                     k
-                     v
-                     (separator-for-operator operator)
-                     (apply-operator/associative operator (rest assoc)))))))
-
-(define/contract (apply-operator/item operator item)
-  ((or/c false/c string?)
-   (or/c string-value?
-         list-value?
-         associative-array-value?)
-   . -> . string?)
-  (log-error "applying operator ~a to item ~a" operator item)
-  (cond ((string-value? item)
-         (apply-operator/string operator item))
-        ((list-value? item)
-         (apply-operator/list operator item))
-        (else
-         (apply-operator/associative operator item))))
-
-(define/contract (apply-operator operator expansions)
-  ((or/c false/c string?)
-   (listof (or/c string?
-                 (listof string?)
-                 (listof (listof string?))))
-   . -> .
-   string?)
-  (log-error "applying operator ~a to expanded values ~a" operator expansions)
-  (cond ((empty? expansions)
-         "")
-        ((empty? (rest expansions))
-         (let ([h (first expansions)])
-           (apply-operator/item operator h)))
-        (else
-         (let ([h (first expansions)]
-               [t (rest expansions)])
-           (format "~a~a~a"
-                   (apply-operator/item operator h)
-                   (separator-for-operator operator)
-                   (apply-operator/list operator t))))))
-
 (define/contract (expand-variables variables assignment operator)
   ((listof variable?)
    assignment?
    (or/c false/c string?)
    . -> .
    string?)
-  (log-error "expanding variables ~a" variables)
-  (log-error "operator = ~a" operator)
   (cond ((empty? variables)
          "")
-        ((not (assignment-has-variable? assignment (first variables)))
-         (expand-variables (rest variables)
-                           assignment
-                           operator))
+        ((empty? (rest variables))
+         (expand-variable (first variables) assignment operator))
         (else
          (define expansion (expand-variable (first variables) assignment operator))
          (cond ((empty-value? expansion)
@@ -257,31 +393,57 @@
                                   assignment
                                   operator))
                (else
-                (match operator
-                  [#f
-                   expansion]
-                  ["#"
-                   (string-append "#" expansion)]
-                  ["+"
-                   expansion]
-                  ["."
-                   (string-append "." expansion)]
-                  ["/"
-                   (string-append "/" expansion)]
-                  [";"
-                   (string-append ";" expansion)]
-                  ["?"
-                   (string-append "?" expansion)]
-                  ["&"
-                   (string-append "&" expansion)]
-                  [else
-                   (error (format "wtf operator is ~a" operator))]))))))
+                (define expanded-tail (expand-variables (rest variables)
+                                                        assignment
+                                                        operator))
+                (if (string=? "" expanded-tail)
+                    (string-append expansion (separator-for-operator operator))
+                    (format "~a~a~a"
+                            expansion
+                            (separator-for-operator operator)
+                            expanded-tail)))))))
 
 (define/contract (expand-template tmpl assignment)
   (template? assignment? . -> . string?)
-  (expand-variables (template-variables tmpl)
+  (define variables (template-variables tmpl))
+  (define operator (template-operator tmpl))
+  (define (has-value? var)
+    (assignment-has-variable? assignment var))
+  (define (is-empty? var)
+    (define val (assignment-ref assignment var))
+    (cond ((string-value? val)
+           #f)
+          ((list-value? val)
+           (empty? val))
+          ((associative-array-value? val)
+           (empty? val))))
+  (define variables-with-values (filter has-value? variables))
+  (define variables/non-empty-value (filter-not is-empty? variables-with-values))
+  (define expanded (expand-variables variables/non-empty-value
                     assignment
                     (template-operator tmpl)))
+  (cond ((empty? variables/non-empty-value)
+         "")
+        (else
+         (match operator
+           [#f
+            expanded]
+           ["&"
+            (string-append "&" expanded)]
+           ["/"
+            (string-append "/" expanded)]
+           [";"
+            (string-append ";" expanded)]
+           ["?"
+            (string-append "?" expanded)]
+           ["+"
+            expanded]
+           ["#"
+            (string-append "#" expanded)]
+           ["."
+            (string-append "." expanded)]
+           [else
+            (error (format "wtf operator is ~a" operator))]))))
 
 (define/contract (expand-string str assignment)
   (string? assignment? . -> . string?)
@@ -339,6 +501,7 @@
                             "path" path
                             "list" list
                             "keys" keys
+                            "v" v
                             "x" x
                             "y" y
                             "empty" empty
@@ -362,247 +525,247 @@
       (check-template "{;count}"
                       assignment
                       ";count=one,two,three")
-      ;; (check-template "{;count*}"
-      ;;                 assignment
-      ;;                 ";count=one;count=two;count=three")
-      ;; (check-template "{?count}"
-      ;;                 assignment
-      ;;                 "?count=one,two,three")
-      ;; (check-template "{?count*}"
-      ;;                 assignment
-      ;;                 "?count=one&count=two&count=three")
-      ;; (check-template "{&count*}"
-      ;;                 assignment
-      ;;                 "&count=one&count=two&count=three")
+      (check-template "{;count*}"
+                      assignment
+                      ";count=one;count=two;count=three")
+      (check-template "{?count}"
+                      assignment
+                      "?count=one,two,three")
+      (check-template "{?count*}"
+                      assignment
+                      "?count=one&count=two&count=three")
+      (check-template "{&count*}"
+                      assignment
+                      "&count=one&count=two&count=three")
 
       ;; examples from page 21 (simple string expansion)
-      ;; (check-equal? (eval-template "{var}" assignment)
-      ;;               "value")
-      ;; (check-equal? (eval-template "{hello}" assignment)
-      ;;               "Hello%20World%21")
-      ;; (check-equal? "50%25"
-      ;;               (eval-template "{half}" assignment))
-      ;; (check-equal? "OX"
-      ;;               (eval-template "O{empty}X" assignment))
-      ;; (check-equal? "OX"
-      ;;               (eval-template "O{undef}X" assignment))
-      ;; (check-equal? (eval-template "{x,y}" assignment)
-      ;;               "1024,768")
-      ;; (check-equal? (eval-template "{x,hello,y}" assignment)
-      ;;               "1024,Hello%20World%21,768")
-      ;; (check-equal? (eval-template "?{x,empty}" assignment)
-      ;;               "?1024,")
-      ;; (check-equal? (eval-template "?{x,undef}" assignment)
-      ;;               "?1024")
-      ;; (check-equal? (eval-template "?{undef,y}" assignment)
-      ;;               "?768")
-      ;; (check-equal? (eval-template "{var:3}" assignment)
-      ;;               "val")
-      ;; (check-equal? (eval-template "{var:30}" assignment)
-      ;;               "value")
-      ;; (check-equal? (eval-template "{list}" assignment)
-      ;;               "red,green,blue")
-      ;; (check-equal? (eval-template "{list*}" assignment)
-      ;;               "red,green,blue")
-      ;; (check-equal? (eval-template "{keys}" assignment)
-      ;;               "semi,%3B,dot,.,comma,%2C")
-      ;; (check-equal? (eval-template "{keys*}" assignment)
-      ;;               "semi=%3B,dot=.,comma=%2C")
+      (check-equal? (eval-template "{var}" assignment)
+                    "value")
+      (check-equal? (eval-template "{hello}" assignment)
+                    "Hello%20World%21")
+      (check-equal? "50%25"
+                    (eval-template "{half}" assignment))
+      (check-equal? "OX"
+                    (eval-template "O{empty}X" assignment))
+      (check-equal? "OX"
+                    (eval-template "O{undef}X" assignment))
+      (check-equal? (eval-template "{x,y}" assignment)
+                    "1024,768")
+      (check-equal? (eval-template "{x,hello,y}" assignment)
+                    "1024,Hello%20World%21,768")
+      (check-equal? (eval-template "?{x,empty}" assignment)
+                    "?1024,")
+      (check-equal? (eval-template "?{x,undef}" assignment)
+                    "?1024")
+      (check-equal? (eval-template "?{undef,y}" assignment)
+                    "?768")
+      (check-equal? (eval-template "{var:3}" assignment)
+                    "val")
+      (check-equal? (eval-template "{var:30}" assignment)
+                    "value")
+      (check-equal? (eval-template "{list}" assignment)
+                    "red,green,blue")
+      (check-equal? (eval-template "{list*}" assignment)
+                    "red,green,blue")
+      (check-equal? (eval-template "{keys}" assignment)
+                    "semi,%3B,dot,.,comma,%2C")
+      (check-equal? (eval-template "{keys*}" assignment)
+                    "semi=%3B,dot=.,comma=%2C")
 
-      ;; ;; ;; examples from page 22 (reserved expansion)
-      ;; (check-equal? (eval-template "{+var}" assignment)
-      ;;               "value")
-      ;; (check-equal? (eval-template "{+hello}" assignment)
-      ;;               "Hello%20World!")
-      ;; (check-equal? (eval-template "{+half}" assignment)
-      ;;               "50%25")
+      ;; examples from page 22 (reserved expansion)
+      (check-equal? (eval-template "{+var}" assignment)
+                    "value")
+      (check-equal? (eval-template "{+hello}" assignment)
+                    "Hello%20World!")
+      (check-equal? (eval-template "{+half}" assignment)
+                    "50%25")
 
-      ;; (check-equal? (eval-template "{base}index" assignment)
-      ;;               "http%3A%2F%2Fexample.com%2Fhome%2Findex")
-      ;; (check-equal? (eval-template "{+base}index" assignment)
-      ;;               "http://example.com/home/index")
-      ;; (check-equal? "OX"
-      ;;               (eval-template "O{+empty}X" assignment))
-      ;; (check-equal? "OX"
-      ;;               (eval-template "O{+undef}X" assignment))
+      (check-equal? (eval-template "{base}index" assignment)
+                    "http%3A%2F%2Fexample.com%2Fhome%2Findex")
+      (check-equal? (eval-template "{+base}index" assignment)
+                    "http://example.com/home/index")
+      (check-equal? (eval-template "O{+empty}X" assignment)
+                    "OX")
+      (check-equal? (eval-template "O{+undef}X" assignment)
+                    "OX")
 
-      ;; (check-equal? "/foo/bar/here"
-      ;;               (eval-template "{+path}/here" assignment))
-      ;; (check-equal? "here?ref=/foo/bar"
-      ;;               (eval-template "here?ref={+path}" assignment))
-      ;; (check-equal? "up/foo/barvalue/here"
-      ;;               (eval-template "up{+path}{var}/here" assignment))
-      ;; (check-equal? "1024,Hello%20World!,768"
-      ;;               (eval-template "{+x,hello,y}" assignment))
-      ;; (check-equal? "/foo/bar,1024/here"
-      ;;               (eval-template "{+path,x}/here" assignment))
+      (check-equal? (eval-template "{+path}/here" assignment)
+                    "/foo/bar/here")
+      (check-equal? (eval-template "here?ref={+path}" assignment)
+                    "here?ref=/foo/bar")
+      (check-equal? (eval-template "up{+path}{var}/here" assignment)
+                    "up/foo/barvalue/here")
+      (check-equal? (eval-template "{+x,hello,y}" assignment)
+                    "1024,Hello%20World!,768")
+      (check-equal? (eval-template "{+path,x}/here" assignment)
+                    "/foo/bar,1024/here")
 
-      ;; (check-equal? (eval-template "{+path:6}/here" assignment)
-      ;;               "/foo/b/here")
-      ;; (check-equal? (eval-template "{+list}" assignment)
-      ;;               "red,green,blue")
-      ;; (check-equal? (eval-template "{+list*}" assignment)
-      ;;               "red,green,blue")
-      ;; (check-equal? (eval-template "{+keys}" assignment)
-      ;;               "semi,;,dot,.,comma,,")
-      ;; (check-equal? (eval-template "{+keys*}" assignment)
-      ;;               "semi=;,dot=.,comma=,")
+      (check-equal? (eval-template "{+path:6}/here" assignment)
+                    "/foo/b/here")
+      (check-equal? (eval-template "{+list}" assignment)
+                    "red,green,blue")
+      (check-equal? (eval-template "{+list*}" assignment)
+                    "red,green,blue")
+      (check-equal? (eval-template "{+keys}" assignment)
+                    "semi,;,dot,.,comma,,")
+      (check-equal? (eval-template "{+keys*}" assignment)
+                    "semi=;,dot=.,comma=,")
 
-      ;; ;; ;; fragment expansion
-      ;; (check-equal? (eval-template "{#var}" assignment)
-      ;;               "#value")
-      ;; (check-equal? (eval-template "{#hello}" assignment)
-      ;;               "#Hello%20World!")
-      ;; (check-equal? (eval-template "{#half}" assignment)
-      ;;               "#50%25")
-      ;; (check-equal? (eval-template "foo{#empty}" assignment)
-      ;;               "foo#")
-      ;; (check-equal? (eval-template "foo{#undef}" assignment)
-      ;;               "foo")
-      ;; (check-equal? (eval-template "{#x,hello,y}" assignment)
-      ;;               "#1024,Hello%20World!,768")
-      ;; (check-equal? (eval-template "{#path,x}/here" assignment)
-      ;;               "#/foo/bar,1024/here")
-      ;; (check-equal? (eval-template "{#path:6}/here" assignment)
-      ;;               "#/foo/b/here")
-      ;; (check-equal? (eval-template "{#list}" assignment)
-      ;;               "#red,green,blue")
-      ;; (check-equal? (eval-template "{#list*}" assignment)
-      ;;               "#red,green,blue")
-      ;; (check-equal? (eval-template "{#keys}" assignment)
-      ;;               "#semi,;,dot,.,comma,,")
-      ;; (check-equal? (eval-template "{#keys*}" assignment)
-      ;;               "#semi=;,dot=.,comma=,")
+      ;; fragment expansion
+      (check-equal? (eval-template "{#var}" assignment)
+                    "#value")
+      (check-equal? (eval-template "{#hello}" assignment)
+                    "#Hello%20World!")
+      (check-equal? (eval-template "{#half}" assignment)
+                    "#50%25")
+      (check-equal? (eval-template "foo{#empty}" assignment)
+                    "foo#")
+      (check-equal? (eval-template "foo{#undef}" assignment)
+                    "foo")
+      (check-equal? (eval-template "{#x,hello,y}" assignment)
+                    "#1024,Hello%20World!,768")
+      (check-equal? (eval-template "{#path,x}/here" assignment)
+                    "#/foo/bar,1024/here")
+      (check-equal? (eval-template "{#path:6}/here" assignment)
+                    "#/foo/b/here")
+      (check-equal? (eval-template "{#list}" assignment)
+                    "#red,green,blue")
+      (check-equal? (eval-template "{#list*}" assignment)
+                    "#red,green,blue")
+      (check-equal? (eval-template "{#keys}" assignment)
+                    "#semi,;,dot,.,comma,,")
+      (check-equal? (eval-template "{#keys*}" assignment)
+                    "#semi=;,dot=.,comma=,")
 
-      ;; ;; ;; label expansion
-      ;; (check-equal? (eval-template "{.who}" assignment)
-      ;;               ".fred")
-      ;; (check-equal? (eval-template "{.who,who}" assignment)
-      ;;               ".fred.fred")
-      ;; (check-equal? (eval-template "{.half,who}" assignment)
-      ;;               ".50%25.fred")
-      ;; (check-equal? (eval-template "www{.dom*}" assignment)
-      ;;               "www.example.com")
-      ;; (check-equal? (eval-template "X{.var}" assignment)
-      ;;               "X.value")
-      ;; (check-equal? (eval-template "X{.empty}" assignment)
-      ;;               "X.")
-      ;; (check-equal? (eval-template "X{.undef}" assignment)
-      ;;               "X")
-      ;; (check-equal? (eval-template "X{.var:3}" assignment)
-      ;;               "X.val")
-      ;; (check-equal? (eval-template "X{.list}" assignment)
-      ;;               "X.red,green,blue")
-      ;; (check-equal? (eval-template "X{.list*}" assignment)
-      ;;               "X.red.green.blue")
-      ;; (check-equal? (eval-template "X{.keys}" assignment)
-      ;;               "X.semi,%3B,dot,.,comma,%2C")
-      ;; (check-equal? (eval-template "X{.keys*}" assignment)
-      ;;               "X.semi=%3B.dot=..comma=%2C")
-      ;; (check-equal? "X"
-      ;;               (eval-template "X{.empty_keys}" assignment))
-      ;; (check-equal? "X"
-      ;;               (eval-template "X{.empty_keys*}" assignment))
+      ;; label expansion
+      (check-equal? (eval-template "{.who}" assignment)
+                    ".fred")
+      (check-equal? (eval-template "{.who,who}" assignment)
+                    ".fred.fred")
+      (check-equal? (eval-template "{.half,who}" assignment)
+                    ".50%25.fred")
+      (check-equal? (eval-template "www{.dom*}" assignment)
+                    "www.example.com")
+      (check-equal? (eval-template "X{.var}" assignment)
+                    "X.value")
+      (check-equal? (eval-template "X{.empty}" assignment)
+                    "X.")
+      (check-equal? (eval-template "X{.undef}" assignment)
+                    "X")
+      (check-equal? (eval-template "X{.var:3}" assignment)
+                    "X.val")
+      (check-equal? (eval-template "X{.list}" assignment)
+                    "X.red,green,blue")
+      (check-equal? (eval-template "X{.list*}" assignment)
+                    "X.red.green.blue")
+      (check-equal? (eval-template "X{.keys}" assignment)
+                    "X.semi,%3B,dot,.,comma,%2C")
+      (check-equal? (eval-template "X{.keys*}" assignment)
+                    "X.semi=%3B.dot=..comma=%2C")
+      (check-equal? (eval-template "X{.empty_keys}" assignment)
+                    "X")
+      (check-equal? (eval-template "X{.empty_keys*}" assignment)
+                    "X")
 
-      ;; ;; examples from page 24 (path segment expansion)
-      ;; (check-equal? "/fred"
-      ;;               (eval-template "{/who}" assignment))
-      ;; (check-equal? "/fred/fred"
-      ;;               (eval-template "{/who,who}" assignment))
-      ;; (check-equal? "/50%25/fred"
-      ;;               (eval-template "{/half,who}" assignment))
-      ;; (check-equal? "/fred/me%2Ftoo"
-      ;;               (eval-template "{/who,dub}" assignment))
-      ;; (check-equal? "/value"
-      ;;               (eval-template "{/var}" assignment))
-      ;; (check-equal? "/value/"
-      ;;               (eval-template "{/var,empty}" assignment))
-      ;; (check-equal? "/value"
-      ;;               (eval-template "{/var,undef}" assignment))
-      ;; (check-equal? "/value/1024/here"
-      ;;               (eval-template "{/var,x}/here" assignment))
-      ;; (check-equal? "/v/value"
-      ;;               (eval-template "{/var:1,var}" assignment))
-      ;; (check-equal? "/red,green,blue"
-      ;;               (eval-template "{/list}" assignment))
-      ;; (check-equal? "/red/green/blue"
-      ;;               (eval-template "{/list*}" assignment))
-      ;; (check-equal? "/red/green/blue/%2Ffoo"
-      ;;               (eval-template "{/list*,path:4}" assignment))
-      ;; (check-equal? "/semi,%3B,dot,.,comma,%2C"
-      ;;               (eval-template "{/keys}" assignment))
-      ;; (check-equal? "/semi=%3B/dot=./comma=%2C"
-      ;;               (eval-template "{/keys*}" assignment))
+      ;; examples from page 24 (path segment expansion)
+      (check-equal? "/fred"
+                    (eval-template "{/who}" assignment))
+      (check-equal? "/fred/fred"
+                    (eval-template "{/who,who}" assignment))
+      (check-equal? "/50%25/fred"
+                    (eval-template "{/half,who}" assignment))
+      (check-equal? "/fred/me%2Ftoo"
+                    (eval-template "{/who,dub}" assignment))
+      (check-equal? "/value"
+                    (eval-template "{/var}" assignment))
+      (check-equal? (eval-template "{/var,empty}" assignment)
+                    "/value/")
+      (check-equal? "/value"
+                    (eval-template "{/var,undef}" assignment))
+      (check-equal? "/value/1024/here"
+                    (eval-template "{/var,x}/here" assignment))
+      (check-equal? "/v/value"
+                    (eval-template "{/var:1,var}" assignment))
+      (check-equal? "/red,green,blue"
+                    (eval-template "{/list}" assignment))
+      (check-equal? "/red/green/blue"
+                    (eval-template "{/list*}" assignment))
+      (check-equal? (eval-template "{/list*,path:4}" assignment)
+                    "/red/green/blue/%2Ffoo")
+      (check-equal? "/semi,%3B,dot,.,comma,%2C"
+                    (eval-template "{/keys}" assignment))
+      (check-equal? (eval-template "{/keys*}" assignment)
+                    "/semi=%3B/dot=./comma=%2C")
 
-      ;; ;; examples from page 25 (path-style parameter expansion)
-      ;; (check-equal? ";who=fred"
-      ;;               (eval-template "{;who}" assignment))
-      ;; (check-equal? ";half=50%25"
-      ;;               (eval-template "{;half}" assignment))
-      ;; (check-equal? ";empty"
-      ;;               (eval-template "{;empty}" assignment))
-      ;; (check-equal? ";v=6;empty;who=fred"
-      ;;               (eval-template "{;v,empty,who}" assignment))
-      ;; (check-equal? ";v=6;who=fred"
-      ;;               (eval-template "{;v,bar,who}" assignment))
-      ;; (check-equal? ";x=1024;y=768"
-      ;;               (eval-template "{;x,y}" assignment))
-      ;; (check-equal? ";x=1024;y=768;empty"
-      ;;               (eval-template "{;x,y,empty}" assignment))
-      ;; (check-equal? ";x=1024;y=768"
-      ;;               (eval-template "{;x,y,undef}" assignment))
-      ;; (check-equal? ";hello=Hello"
-      ;;               (eval-template "{;hello:5}" assignment))
-      ;; (check-equal? ";list=red,green,blue"
-      ;;               (eval-template "{;list}" assignment))
-      ;; (check-equal? ";list=red;list=green;list=blue"
-      ;;               (eval-template "{;list*}" assignment))
-      ;; (check-equal? ";keys=semi,%3B,dot,.,comma,%2C"
-      ;;               (eval-template "{;keys}" assignment))
-      ;; (check-equal? ";semi=%3B;dot=.;comma=%2C"
-      ;;               (eval-template "{;keys*}" assignment))
+      ;; examples from page 25 (path-style parameter expansion)
+      (check-equal? (eval-template "{;who}" assignment)
+                    ";who=fred")
+      (check-equal? (eval-template "{;half}" assignment)
+                    ";half=50%25")
+      (check-equal? (eval-template "{;empty}" assignment)
+                    ";empty")
+      (check-equal? (eval-template "{;v,empty,who}" assignment)
+                    ";v=6;empty;who=fred")
+      (check-equal? (eval-template "{;v,bar,who}" assignment)
+                    ";v=6;who=fred")
+      (check-equal? (eval-template "{;x,y}" assignment)
+                    ";x=1024;y=768")
+      (check-equal? (eval-template "{;x,y,empty}" assignment)
+                    ";x=1024;y=768;empty")
+      (check-equal? (eval-template "{;x,y,undef}" assignment)
+                    ";x=1024;y=768")
+      (check-equal? (eval-template "{;hello:5}" assignment)
+                    ";hello=Hello")
+      (check-equal? (eval-template "{;list}" assignment)
+                    ";list=red,green,blue")
+      (check-equal? (eval-template "{;list*}" assignment)
+                    ";list=red;list=green;list=blue")
+      (check-equal? (eval-template "{;keys}" assignment)
+                    ";keys=semi,%3B,dot,.,comma,%2C")
+      (check-equal? (eval-template "{;keys*}" assignment)
+                    ";semi=%3B;dot=.;comma=%2C")
 
-      ;; ;; form-style query expansion
-      ;; (check-equal? "?who=fred"
-      ;;               (eval-template "{?who}" assignment))
-      ;; (check-equal? "?half=50%25"
-      ;;               (eval-template "{?half}" assignment))
-      ;; (check-equal? "?x=1024&y=768"
-      ;;               (eval-template "{?x,y}" assignment))
-      ;; (check-equal? "?x=1024&y=768&empty="
-      ;;               (eval-template "{?x,y,empty}" assignment))
-      ;; (check-equal? "?x=1024&y=768"
-      ;;               (eval-template "{?x,y,undef}" assignment))
-      ;; (check-equal? "?var=val"
-      ;;               (eval-template "{?var:3}" assignment))
-      ;; (check-equal? "?list=red,green,blue"
-      ;;               (eval-template "{?list}" assignment))
-      ;; (check-equal? "?list=red&list=green&list=blue"
-      ;;               (eval-template "{?list*}" assignment))
-      ;; (check-equal? "?keys=semi,%3B,dot,.,comma,%2C"
-      ;;               (eval-template "{?keys}" assignment))
-      ;; (check-equal? "?semi=%3B&dot=.&comma=%2C"
-      ;;               (eval-template "{?keys*}" assignment))
+      ;; form-style query expansion
+      (check-equal? (eval-template "{?who}" assignment)
+                    "?who=fred")
+      (check-equal? (eval-template "{?half}" assignment)
+                    "?half=50%25")
+      (check-equal? (eval-template "{?x,y}" assignment)
+                    "?x=1024&y=768")
+      (check-equal? (eval-template "{?x,y,empty}" assignment)
+                    "?x=1024&y=768&empty=")
+      (check-equal? (eval-template "{?x,y,undef}" assignment)
+                    "?x=1024&y=768")
+      (check-equal? (eval-template "{?var:3}" assignment)
+                    "?var=val")
+      (check-equal? (eval-template "{?list}" assignment)
+                    "?list=red,green,blue")
+      (check-equal? (eval-template "{?list*}" assignment)
+                    "?list=red&list=green&list=blue")
+      (check-equal? (eval-template "{?keys}" assignment)
+                    "?keys=semi,%3B,dot,.,comma,%2C")
+      (check-equal? (eval-template "{?keys*}" assignment)
+                    "?semi=%3B&dot=.&comma=%2C")
 
-      ;; ;; form-style query continuation (page 26)
-      ;; (check-equal? "&who=fred"
-      ;;               (eval-template "{&who}" assignment))
-      ;; (check-equal? "&half=50%25"
-      ;;               (eval-template "{&half}" assignment))
-      ;; (check-equal? "?fixed=yes&x=1024"
-      ;;               (eval-template "?fixed=yes{&x}" assignment))
-      ;; (check-equal? "&x=1024&y=768&empty="
-      ;;               (eval-template "{&x,y,empty}" assignment))
-      ;; (check-equal? "&x=1024&y=768"
-      ;;               (eval-template "{&x,y,undef}" assignment))
-      ;; (check-equal? "&var=val"
-      ;;               (eval-template "{&var:3}" assignment))
-      ;; (check-equal? "&list=red,green,blue"
-      ;;               (eval-template "{&list}" assignment))
-      ;; (check-equal? "&list=red&list=green&list=blue"
-      ;;               (eval-template "{&list*}" assignment))
-      ;; (check-equal? "&keys=semi,%3B,dot,.,comma,%2C"
-      ;;               (eval-template "{&keys}" assignment))
-      ;; (check-equal? "&semi=%3B&dot=.&comma=%2C"
-      ;;               (eval-template "{&keys*}" assignment))
+      ;; form-style query continuation (page 26)
+      (check-equal? (eval-template "{&who}" assignment)
+                    "&who=fred")
+      (check-equal? (eval-template "{&half}" assignment)
+                    "&half=50%25")
+      (check-equal? (eval-template "?fixed=yes{&x}" assignment)
+                    "?fixed=yes&x=1024")
+      (check-equal? (eval-template "{&x,y,empty}" assignment)
+                    "&x=1024&y=768&empty=")
+      (check-equal? (eval-template "{&x,y,undef}" assignment)
+                    "&x=1024&y=768")
+      (check-equal? (eval-template "{&var:3}" assignment)
+                    "&var=val")
+      (check-equal? (eval-template "{&list}" assignment)
+                    "&list=red,green,blue")
+      (check-equal? (eval-template "{&list*}" assignment)
+                    "&list=red&list=green&list=blue")
+      (check-equal? (eval-template "{&keys}" assignment)
+                    "&keys=semi,%3B,dot,.,comma,%2C")
+      (check-equal? (eval-template "{&keys*}" assignment)
+                    "&semi=%3B&dot=.&comma=%2C")
       )))
