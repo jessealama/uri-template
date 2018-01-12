@@ -48,8 +48,8 @@
 (define/contract (encode/reserved str)
   (-> string? string?)
   (string-replace (string-replace str "%" "%25")
-                     " "
-                     "%20"))
+                  " "
+                  "%20"))
 
 (define/contract (explode value)
   (value? . -> . (or/c string-value? list-value?))
