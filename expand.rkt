@@ -450,7 +450,7 @@
            ["."
             (string-append "." expanded)]
            [else
-            (error (format "wtf operator is ~a" operator))]))))
+            (error (format "Unknown operator ~a" operator))]))))
 
 (define/contract (expand-string str assignment)
   (string? assignment? . -> . string?)
