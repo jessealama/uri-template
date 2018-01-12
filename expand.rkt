@@ -478,6 +478,11 @@
                              assignment)))
 
 (module+ test
+  (check-exn exn:fail?
+             (lambda ()
+               (eval-template "hi{woah" (hash)))))
+
+(module+ test
   ;; examples coming from the RFC (page 18)
   (let ([count '("one" "two" "three")]
         [dom '("example" "com")]
