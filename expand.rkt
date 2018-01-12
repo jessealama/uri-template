@@ -551,233 +551,334 @@
                       "&count=one&count=two&count=three")
 
       ;; examples from page 21 (simple string expansion)
-      (check-equal? (eval-template "{var}" assignment)
-                    "value")
-      (check-equal? (eval-template "{hello}" assignment)
-                    "Hello%20World%21")
-      (check-equal? "50%25"
-                    (eval-template "{half}" assignment))
-      (check-equal? "OX"
-                    (eval-template "O{empty}X" assignment))
-      (check-equal? "OX"
-                    (eval-template "O{undef}X" assignment))
-      (check-equal? (eval-template "{x,y}" assignment)
-                    "1024,768")
-      (check-equal? (eval-template "{x,hello,y}" assignment)
-                    "1024,Hello%20World%21,768")
-      (check-equal? (eval-template "?{x,empty}" assignment)
-                    "?1024,")
-      (check-equal? (eval-template "?{x,undef}" assignment)
-                    "?1024")
-      (check-equal? (eval-template "?{undef,y}" assignment)
-                    "?768")
-      (check-equal? (eval-template "{var:3}" assignment)
-                    "val")
-      (check-equal? (eval-template "{var:30}" assignment)
-                    "value")
-      (check-equal? (eval-template "{list}" assignment)
-                    "red,green,blue")
-      (check-equal? (eval-template "{list*}" assignment)
-                    "red,green,blue")
-      (check-equal? (eval-template "{keys}" assignment)
-                    "semi,%3B,dot,.,comma,%2C")
-      (check-equal? (eval-template "{keys*}" assignment)
-                    "semi=%3B,dot=.,comma=%2C")
+      (check-template "{var}"
+                      assignment
+                      "value")
+      (check-template "{hello}"
+                      assignment
+                      "Hello%20World%21")
+      (eval-template "{half}"
+                     assignment)
+      (eval-template "O{empty}X"
+                     assignment)
+      (eval-template "O{undef}X"
+                     assignment)
+      (check-template "{x,y}"
+                      assignment
+                      "1024,768")
+      (check-template "{x,hello,y}"
+                      assignment
+                      "1024,Hello%20World%21,768")
+      (check-template "?{x,empty}"
+                      assignment
+                      "?1024,")
+      (check-template "?{x,undef}"
+                      assignment
+                      "?1024")
+      (check-template "?{undef,y}"
+                      assignment
+                      "?768")
+      (check-template "{var:3}"
+                      assignment
+                      "val")
+      (check-template "{var:30}"
+                      assignment
+                      "value")
+      (check-template "{list}"
+                      assignment
+                      "red,green,blue")
+      (check-template "{list*}"
+                      assignment
+                      "red,green,blue")
+      (check-template "{keys}"
+                      assignment
+                      "semi,%3B,dot,.,comma,%2C")
+      (check-template "{keys*}"
+                      assignment
+                      "semi=%3B,dot=.,comma=%2C")
 
       ;; examples from page 22 (reserved expansion)
-      (check-equal? (eval-template "{+var}" assignment)
-                    "value")
-      (check-equal? (eval-template "{+hello}" assignment)
-                    "Hello%20World!")
-      (check-equal? (eval-template "{+half}" assignment)
-                    "50%25")
+      (check-template "{+var}"
+                      assignment
+                      "value")
+      (check-template "{+hello}"
+                      assignment
+                      "Hello%20World!")
+      (check-template "{+half}"
+                      assignment
+                      "50%25")
+      (check-template "{base}index"
+                      assignment
+                      "http%3A%2F%2Fexample.com%2Fhome%2Findex")
+      (check-template "{+base}index"
+                      assignment
+                      "http://example.com/home/index")
+      (check-template "O{+empty}X"
+                      assignment
+                      "OX")
+      (check-template "O{+undef}X"
+                      assignment
+                      "OX")
+      (check-template "{+path}/here"
+                      assignment
+                      "/foo/bar/here")
+      (check-template "here?ref={+path}"
+                      assignment
+                      "here?ref=/foo/bar")
+      (check-template "up{+path}{var}/here"
+                      assignment
+                      "up/foo/barvalue/here")
+      (check-template "{+x,hello,y}"
+                      assignment
+                      "1024,Hello%20World!,768")
+      (check-template "{+path,x}/here"
+                      assignment
+                      "/foo/bar,1024/here")
 
-      (check-equal? (eval-template "{base}index" assignment)
-                    "http%3A%2F%2Fexample.com%2Fhome%2Findex")
-      (check-equal? (eval-template "{+base}index" assignment)
-                    "http://example.com/home/index")
-      (check-equal? (eval-template "O{+empty}X" assignment)
-                    "OX")
-      (check-equal? (eval-template "O{+undef}X" assignment)
-                    "OX")
-
-      (check-equal? (eval-template "{+path}/here" assignment)
-                    "/foo/bar/here")
-      (check-equal? (eval-template "here?ref={+path}" assignment)
-                    "here?ref=/foo/bar")
-      (check-equal? (eval-template "up{+path}{var}/here" assignment)
-                    "up/foo/barvalue/here")
-      (check-equal? (eval-template "{+x,hello,y}" assignment)
-                    "1024,Hello%20World!,768")
-      (check-equal? (eval-template "{+path,x}/here" assignment)
-                    "/foo/bar,1024/here")
-
-      (check-equal? (eval-template "{+path:6}/here" assignment)
-                    "/foo/b/here")
-      (check-equal? (eval-template "{+list}" assignment)
-                    "red,green,blue")
-      (check-equal? (eval-template "{+list*}" assignment)
-                    "red,green,blue")
-      (check-equal? (eval-template "{+keys}" assignment)
-                    "semi,;,dot,.,comma,,")
-      (check-equal? (eval-template "{+keys*}" assignment)
-                    "semi=;,dot=.,comma=,")
+      (check-template "{+path:6}/here"
+                      assignment
+                      "/foo/b/here")
+      (check-template "{+list}"
+                      assignment
+                      "red,green,blue")
+      (check-template "{+list*}"
+                      assignment
+                      "red,green,blue")
+      (check-template "{+keys}"
+                      assignment
+                      "semi,;,dot,.,comma,,")
+      (check-template "{+keys*}"
+                      assignment
+                      "semi=;,dot=.,comma=,")
 
       ;; fragment expansion
-      (check-equal? (eval-template "{#var}" assignment)
-                    "#value")
-      (check-equal? (eval-template "{#hello}" assignment)
-                    "#Hello%20World!")
-      (check-equal? (eval-template "{#half}" assignment)
-                    "#50%25")
-      (check-equal? (eval-template "foo{#empty}" assignment)
-                    "foo#")
-      (check-equal? (eval-template "foo{#undef}" assignment)
-                    "foo")
-      (check-equal? (eval-template "{#x,hello,y}" assignment)
-                    "#1024,Hello%20World!,768")
-      (check-equal? (eval-template "{#path,x}/here" assignment)
-                    "#/foo/bar,1024/here")
-      (check-equal? (eval-template "{#path:6}/here" assignment)
-                    "#/foo/b/here")
-      (check-equal? (eval-template "{#list}" assignment)
-                    "#red,green,blue")
-      (check-equal? (eval-template "{#list*}" assignment)
-                    "#red,green,blue")
-      (check-equal? (eval-template "{#keys}" assignment)
-                    "#semi,;,dot,.,comma,,")
-      (check-equal? (eval-template "{#keys*}" assignment)
-                    "#semi=;,dot=.,comma=,")
+      (check-template "{#var}"
+                      assignment
+                      "#value")
+      (check-template "{#hello}"
+                      assignment
+                      "#Hello%20World!")
+      (check-template "{#half}"
+                      assignment
+                      "#50%25")
+      (check-template "foo{#empty}"
+                      assignment
+                      "foo#")
+      (check-template "foo{#undef}"
+                      assignment
+                      "foo")
+      (check-template "{#x,hello,y}"
+                      assignment
+                      "#1024,Hello%20World!,768")
+      (check-template "{#path,x}/here"
+                      assignment
+                      "#/foo/bar,1024/here")
+      (check-template "{#path:6}/here"
+                      assignment
+                      "#/foo/b/here")
+      (check-template "{#list}"
+                      assignment
+                      "#red,green,blue")
+      (check-template "{#list*}"
+                      assignment
+                      "#red,green,blue")
+      (check-template "{#keys}"
+                      assignment
+                      "#semi,;,dot,.,comma,,")
+      (check-template "{#keys*}"
+                      assignment
+                      "#semi=;,dot=.,comma=,")
 
       ;; label expansion
-      (check-equal? (eval-template "{.who}" assignment)
-                    ".fred")
-      (check-equal? (eval-template "{.who,who}" assignment)
-                    ".fred.fred")
-      (check-equal? (eval-template "{.half,who}" assignment)
-                    ".50%25.fred")
-      (check-equal? (eval-template "www{.dom*}" assignment)
-                    "www.example.com")
-      (check-equal? (eval-template "X{.var}" assignment)
-                    "X.value")
-      (check-equal? (eval-template "X{.empty}" assignment)
-                    "X.")
-      (check-equal? (eval-template "X{.undef}" assignment)
-                    "X")
-      (check-equal? (eval-template "X{.var:3}" assignment)
-                    "X.val")
-      (check-equal? (eval-template "X{.list}" assignment)
-                    "X.red,green,blue")
-      (check-equal? (eval-template "X{.list*}" assignment)
-                    "X.red.green.blue")
-      (check-equal? (eval-template "X{.keys}" assignment)
-                    "X.semi,%3B,dot,.,comma,%2C")
-      (check-equal? (eval-template "X{.keys*}" assignment)
-                    "X.semi=%3B.dot=..comma=%2C")
-      (check-equal? (eval-template "X{.empty_keys}" assignment)
-                    "X")
-      (check-equal? (eval-template "X{.empty_keys*}" assignment)
-                    "X")
+      (check-template "{.who}"
+                      assignment
+                      ".fred")
+      (check-template "{.who,who}"
+                      assignment
+                      ".fred.fred")
+      (check-template "{.half,who}"
+                      assignment
+                      ".50%25.fred")
+      (check-template "www{.dom*}"
+                      assignment
+                      "www.example.com")
+      (check-template "X{.var}"
+                      assignment
+                      "X.value")
+      (check-template "X{.empty}"
+                      assignment
+                      "X.")
+      (check-template "X{.undef}"
+                      assignment
+                      "X")
+      (check-template "X{.var:3}"
+                      assignment
+                      "X.val")
+      (check-template "X{.list}"
+                      assignment
+                      "X.red,green,blue")
+      (check-template "X{.list*}"
+                      assignment
+                      "X.red.green.blue")
+      (check-template "X{.keys}"
+                      assignment
+                      "X.semi,%3B,dot,.,comma,%2C")
+      (check-template "X{.keys*}"
+                      assignment
+                      "X.semi=%3B.dot=..comma=%2C")
+      (check-template "X{.empty_keys}"
+                      assignment
+                      "X")
+      (check-template "X{.empty_keys*}"
+                      assignment
+                      "X")
 
       ;; examples from page 24 (path segment expansion)
-      (check-equal? "/fred"
-                    (eval-template "{/who}" assignment))
-      (check-equal? "/fred/fred"
-                    (eval-template "{/who,who}" assignment))
-      (check-equal? "/50%25/fred"
-                    (eval-template "{/half,who}" assignment))
-      (check-equal? "/fred/me%2Ftoo"
-                    (eval-template "{/who,dub}" assignment))
-      (check-equal? "/value"
-                    (eval-template "{/var}" assignment))
-      (check-equal? (eval-template "{/var,empty}" assignment)
-                    "/value/")
-      (check-equal? "/value"
-                    (eval-template "{/var,undef}" assignment))
-      (check-equal? "/value/1024/here"
-                    (eval-template "{/var,x}/here" assignment))
-      (check-equal? "/v/value"
-                    (eval-template "{/var:1,var}" assignment))
-      (check-equal? "/red,green,blue"
-                    (eval-template "{/list}" assignment))
-      (check-equal? "/red/green/blue"
-                    (eval-template "{/list*}" assignment))
-      (check-equal? (eval-template "{/list*,path:4}" assignment)
-                    "/red/green/blue/%2Ffoo")
-      (check-equal? "/semi,%3B,dot,.,comma,%2C"
-                    (eval-template "{/keys}" assignment))
-      (check-equal? (eval-template "{/keys*}" assignment)
-                    "/semi=%3B/dot=./comma=%2C")
+      (check-template "{/who}"
+                      assignment
+                      "/fred")
+      (check-template "{/who,who}"
+                      assignment
+                      "/fred/fred")
+      (check-template "{/half,who}"
+                      assignment
+                      "/50%25/fred")
+      (check-template "{/who,dub}"
+                      assignment
+                      "/fred/me%2Ftoo")
+      (check-template "{/var}"
+                      assignment
+                      "/value")
+      (check-template "{/var,empty}"
+                      assignment
+                      "/value/")
+      (check-template "{/var,undef}"
+                      assignment
+                      "/value")
+      (check-template "{/var,x}/here"
+                      assignment
+                      "/value/1024/here")
+      (check-template "{/var:1,var}"
+                      assignment
+                      "/v/value")
+      (check-template "{/list}"
+                      assignment
+                      "/red,green,blue")
+      (check-template "{/list*}"
+                      assignment
+                      "/red/green/blue")
+      (check-template "{/list*,path:4}"
+                      assignment
+                      "/red/green/blue/%2Ffoo")
+      (check-template "{/keys}"
+                      assignment
+                      "/semi,%3B,dot,.,comma,%2C")
+      (check-template "{/keys*}"
+                      assignment
+                      "/semi=%3B/dot=./comma=%2C")
 
       ;; examples from page 25 (path-style parameter expansion)
-      (check-equal? (eval-template "{;who}" assignment)
-                    ";who=fred")
-      (check-equal? (eval-template "{;half}" assignment)
-                    ";half=50%25")
-      (check-equal? (eval-template "{;empty}" assignment)
-                    ";empty")
-      (check-equal? (eval-template "{;v,empty,who}" assignment)
-                    ";v=6;empty;who=fred")
-      (check-equal? (eval-template "{;v,bar,who}" assignment)
-                    ";v=6;who=fred")
-      (check-equal? (eval-template "{;x,y}" assignment)
-                    ";x=1024;y=768")
-      (check-equal? (eval-template "{;x,y,empty}" assignment)
-                    ";x=1024;y=768;empty")
-      (check-equal? (eval-template "{;x,y,undef}" assignment)
-                    ";x=1024;y=768")
-      (check-equal? (eval-template "{;hello:5}" assignment)
-                    ";hello=Hello")
-      (check-equal? (eval-template "{;list}" assignment)
-                    ";list=red,green,blue")
-      (check-equal? (eval-template "{;list*}" assignment)
-                    ";list=red;list=green;list=blue")
-      (check-equal? (eval-template "{;keys}" assignment)
-                    ";keys=semi,%3B,dot,.,comma,%2C")
-      (check-equal? (eval-template "{;keys*}" assignment)
-                    ";semi=%3B;dot=.;comma=%2C")
+      (check-template "{;who}"
+                      assignment
+                      ";who=fred")
+      (check-template "{;half}"
+                      assignment
+                      ";half=50%25")
+      (check-template "{;empty}"
+                      assignment
+                      ";empty")
+      (check-template "{;v,empty,who}"
+                      assignment
+                      ";v=6;empty;who=fred")
+      (check-template "{;v,bar,who}"
+                      assignment
+                      ";v=6;who=fred")
+      (check-template "{;x,y}"
+                      assignment
+                      ";x=1024;y=768")
+      (check-template "{;x,y,empty}"
+                      assignment
+                      ";x=1024;y=768;empty")
+      (check-template "{;x,y,undef}"
+                      assignment
+                      ";x=1024;y=768")
+      (check-template "{;hello:5}"
+                      assignment
+                      ";hello=Hello")
+      (check-template "{;list}"
+                      assignment
+                      ";list=red,green,blue")
+      (check-template "{;list*}"
+                      assignment
+                      ";list=red;list=green;list=blue")
+      (check-template "{;keys}"
+                      assignment
+                      ";keys=semi,%3B,dot,.,comma,%2C")
+      (check-template "{;keys*}"
+                      assignment
+                      ";semi=%3B;dot=.;comma=%2C")
 
       ;; form-style query expansion
-      (check-equal? (eval-template "{?who}" assignment)
-                    "?who=fred")
-      (check-equal? (eval-template "{?half}" assignment)
-                    "?half=50%25")
-      (check-equal? (eval-template "{?x,y}" assignment)
-                    "?x=1024&y=768")
-      (check-equal? (eval-template "{?x,y,empty}" assignment)
-                    "?x=1024&y=768&empty=")
-      (check-equal? (eval-template "{?x,y,undef}" assignment)
-                    "?x=1024&y=768")
-      (check-equal? (eval-template "{?var:3}" assignment)
-                    "?var=val")
-      (check-equal? (eval-template "{?list}" assignment)
-                    "?list=red,green,blue")
-      (check-equal? (eval-template "{?list*}" assignment)
-                    "?list=red&list=green&list=blue")
-      (check-equal? (eval-template "{?keys}" assignment)
-                    "?keys=semi,%3B,dot,.,comma,%2C")
-      (check-equal? (eval-template "{?keys*}" assignment)
-                    "?semi=%3B&dot=.&comma=%2C")
+      (check-template "{?who}"
+                      assignment
+                      "?who=fred")
+      (check-template "{?half}"
+                      assignment
+                      "?half=50%25")
+      (check-template "{?x,y}"
+                      assignment
+                      "?x=1024&y=768")
+      (check-template "{?x,y,empty}"
+                      assignment
+                      "?x=1024&y=768&empty=")
+      (check-template "{?x,y,undef}"
+                      assignment
+                      "?x=1024&y=768")
+      (check-template "{?var:3}"
+                      assignment
+                      "?var=val")
+      (check-template "{?list}"
+                      assignment
+                      "?list=red,green,blue")
+      (check-template "{?list*}"
+                      assignment
+                      "?list=red&list=green&list=blue")
+      (check-template "{?keys}"
+                      assignment
+                      "?keys=semi,%3B,dot,.,comma,%2C")
+      (check-template "{?keys*}"
+                      assignment
+                      "?semi=%3B&dot=.&comma=%2C")
 
       ;; form-style query continuation (page 26)
-      (check-equal? (eval-template "{&who}" assignment)
-                    "&who=fred")
-      (check-equal? (eval-template "{&half}" assignment)
-                    "&half=50%25")
-      (check-equal? (eval-template "?fixed=yes{&x}" assignment)
-                    "?fixed=yes&x=1024")
-      (check-equal? (eval-template "{&x,y,empty}" assignment)
-                    "&x=1024&y=768&empty=")
-      (check-equal? (eval-template "{&x,y,undef}" assignment)
-                    "&x=1024&y=768")
-      (check-equal? (eval-template "{&var:3}" assignment)
-                    "&var=val")
-      (check-equal? (eval-template "{&list}" assignment)
-                    "&list=red,green,blue")
-      (check-equal? (eval-template "{&list*}" assignment)
-                    "&list=red&list=green&list=blue")
-      (check-equal? (eval-template "{&keys}" assignment)
-                    "&keys=semi,%3B,dot,.,comma,%2C")
-      (check-equal? (eval-template "{&keys*}" assignment)
-                    "&semi=%3B&dot=.&comma=%2C")
+      (check-template "{&who}"
+                      assignment
+                      "&who=fred")
+      (check-template "{&half}"
+                      assignment
+                      "&half=50%25")
+      (check-template "?fixed=yes{&x}"
+                      assignment
+                      "?fixed=yes&x=1024")
+      (check-template "{&x,y,empty}"
+                      assignment
+                      "&x=1024&y=768&empty=")
+      (check-template "{&x,y,undef}"
+                      assignment
+                      "&x=1024&y=768")
+      (check-template "{&var:3}"
+                      assignment
+                      "&var=val")
+      (check-template "{&list}"
+                      assignment
+                      "&list=red,green,blue")
+      (check-template "{&list*}"
+                      assignment
+                      "&list=red&list=green&list=blue")
+      (check-template "{&keys}"
+                      assignment
+                      "&keys=semi,%3B,dot,.,comma,%2C")
+      (check-template "{&keys*}"
+                      assignment
+                      "&semi=%3B&dot=.&comma=%2C")
       )))
