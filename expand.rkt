@@ -77,6 +77,12 @@
     [else
      (error (format "Don't know how to apply modifier ~a to value ~a" modifier value))]))
 
+(module+ test
+  (check-exn exn:fail:contract?
+             (lambda ()
+               (apply-modifier (list 'max-length 5)
+                               (list "boom")))))
+
 (define/contract (render-items items separator encoder)
   ((listof string?) string? (-> string? string?) . -> . string?)
   (cond ((empty? items)
