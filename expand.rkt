@@ -1,6 +1,7 @@
 #lang racket
 
-(provide expand-template)
+(provide (rename-out [eval-template
+                      expand-template]))
 
 (require racket/contract
          racket/list
