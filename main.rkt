@@ -1,6 +1,12 @@
 #lang racket/base
 
-(provide uri-template?)
+(provide uri-template?
+         expand-template
+         assignment?
+         value?
+         list-value?
+         string-value?
+         associative-array-value?)
 
 (require (only-in (file "parse.rkt")
                   uri-template?)
@@ -9,4 +15,7 @@
          (only-in (file "assignment.rkt")
                   assignment?)
          (only-in (file "value.rkt")
-                  value?))
+                  value?
+                  list-value?
+                  string-value?
+                  associative-array-value?))
