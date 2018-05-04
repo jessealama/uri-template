@@ -119,10 +119,10 @@
 (define (uri-template? x)
   (and (string? x)
        (with-handlers ([exn:fail:read? (lambda (e) #f)])
-         (let ([lexed-template (lex-uri-template x)])
-           (let ([expression-tokens (filter expression-token? lexed-template)])
-             (let ([expressions (map token-struct-val expression-tokens)])
-               (andmap uri-template-expression? expressions)))))))
+         (define lexed-template (lex-uri-template x))
+         (define expression-tokens (filter expression-token? lexed-template))
+         (define expressions (map token-struct-val expression-tokens))
+         (andmap uri-template-expression? expressions))))
 
 (module+ test
   (check-true (uri-template? "http://example.com/~{username}/"))
