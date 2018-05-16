@@ -2,7 +2,7 @@
 
 (define collection "uri-template")
 
-(define version "0.5")
+(define version "0.5.2")
 
 (define deps
   '("base"
