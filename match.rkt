@@ -1,5 +1,19 @@
 #lang racket/base
 
+(require racket/contract
+         racket/list
+         racket/string
+         (file "template.rkt")
+         (file "assignment.rkt")
+         (file "parse.rkt"))
+
+(module+ test
+  (require rackunit))
+
+;; obviously wrong
+(define (extend-assignment ass)
+  ass)
+
 (define (match-template-with-assignment template uri pos assignment)
   ((or/c string? template?)
    string?
@@ -37,7 +51,7 @@
 (define/contract (match-template template uri)
   (string? string? . -> . (or/c assignment? false/c))
   (define parsed (parse-template template))
-  )
+  (list))
 
 (module+ test
   (check-true (assignment? (match-template "http://example.com/~{username}/"
