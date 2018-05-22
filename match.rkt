@@ -53,6 +53,10 @@
   (define parsed (parse-template template))
   (list))
 
+#|
+
+Functionality not yet ready.
+
 (module+ test
   (check-true (assignment? (match-template "http://example.com/~{username}/"
                                            "http://example.com/~bob/")))
@@ -62,3 +66,5 @@
                                             "http://example.com/~bob")))
   (check-true (assignment? (match-template "http://example.com/~{username}"
                                            "http://example.com/~bob/"))))
+
+|#
