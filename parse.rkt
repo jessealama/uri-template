@@ -2,7 +2,8 @@
 
 (provide uri-template-expression?
          uri-template?
-         parse-template)
+         parse-template
+         variables-of)
 
 (module+ test
   (require rackunit)
@@ -22,17 +23,20 @@
                   rest
                   index-of
                   split-at
-                  index-where))
+                  index-where
+                  remove-duplicates))
 (require (only-in (file "expression-parser.brag")
                   parse))
 (require (only-in (file "template-lexer.rkt")
                   lex-uri-template)
          (only-in (file "variable.rkt")
                   variable
-                  variable?)
+                  variable?
+                  variable-name)
          (only-in (file "template.rkt")
                   template
-                  template?))
+                  template?
+                  template-variables))
 (require racket/contract)
 
 (define (expression-token? token)
@@ -227,3 +231,32 @@
 (module+ test
   (check-equal? '("hi")
                 (parse-template "hi")))
+
+(define/contract (variables-of/list l)
+  ((listof (or/c string? template?)) . -> . (listof string?))
+  (match l
+    [(list)
+     empty]
+    [(list-rest (? string?) r)
+     (variables-of/list r)]
+    [(list-rest t r)
+     (define vs (map variable-name
+                     (template-variables t)))
+     (remove-duplicates (append vs (variables-of/list r))
+                        string=?)]))
+
+(define/contract (variables-of template)
+  (string? . -> . (listof string?))
+  (variables-of/list (parse-template template)))
+
+(module+ test
+  (check-true (empty? (variables-of "")))
+  (check-true (empty? (variables-of "hi there, no template")))
+  (let* ([template "hi{there},{+how,are}you"]
+         [vs (variables-of template)])
+    (check-false (list? (member "hi" vs)))
+    (check-true (list? (member "there" vs)))
+    (check-false (list? (member "," vs)))
+    (check-true (list? (member "how" vs)))
+    (check-true (list? (member "are" vs)))
+    (check-false (list? (member "you" vs)))))
