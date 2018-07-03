@@ -6,10 +6,12 @@
          value?
          list-value?
          string-value?
-         associative-array-value?)
+         associative-array-value?
+         variables-of)
 
 (require (only-in (file "parse.rkt")
-                  uri-template?)
+                  uri-template?
+                  variables-of)
          (only-in (file "expand.rkt")
                   expand-template)
          (only-in (file "assignment.rkt")
