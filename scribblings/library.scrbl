@@ -5,8 +5,6 @@
 
 @title{Library interface}
 
-Three functions are provided.
-
 @defproc[
 (uri-template?
 [thing any/c])
