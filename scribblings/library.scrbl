@@ -48,3 +48,15 @@ Naturally, the template should adhere to the syntax of URI Template; otherwise, 
 References to undefined variables do not lead to an error. Such variables will be silently ignored, according to RFC 6570.
 
 Attempts to do syntactically unobjectionable but semantically bad things, such as applying the max-length modifier—something that makes sense only for strings—to a list or associative array, will lead to error (of type @racket[exn:fail:contract?]).
+
+@defproc[
+(variables-of
+[template string?]
+)
+(listof string?)]
+
+Find all variables occuring in a template. The result is a list of unique strings.
+
+No promises is made about the order of the variables appearing in the result. The first variable appearing in the template might occur at the beginning, middle, or end of the list.
+
+As with @tt{expand-template}, the given string should adhere to the syntax of URI Template; otherwise, an error (of type @racket[exn:fail?]) will be thrown.
