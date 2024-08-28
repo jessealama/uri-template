@@ -17,6 +17,6 @@
 
 (define pkg-desc "Processing URI Templates (IETF RFC 6570)")
 
-(define pkg-authors '("jesse@lisp.sh"))
+(define pkg-authors '("jesse@serverracket.com"))
 
 (define scribblings '(("scribblings/uri-template.scrbl" ())))
